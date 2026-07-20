@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Added viewport-fit=cover to allow safe-area inset detection -->
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Pro Multi-Res Camera</title>
     <style>
         :root {
@@ -23,13 +24,15 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            height: 100vh; /* Fallback for older browsers */
+            height: 100dvh; /* Fixes browser navigation bar covering the bottom */
             overflow: hidden;
         }
 
         /* Header Info */
         header {
             padding: 15px;
+            padding-top: calc(15px + env(safe-area-inset-top, 0px)); /* Accommodate top notch */
             text-align: center;
             font-size: 14px;
             font-weight: 600;
@@ -72,6 +75,8 @@
         #controls-panel {
             background-color: var(--panel-bg);
             padding: 20px 20px 35px 20px;
+            /* Prevents the home swipe-indicator overlay from blocking the button */
+            padding-bottom: calc(35px + env(safe-area-inset-bottom, 0px));
             border-top: 1px solid #333;
             display: flex;
             flex-direction: column;
@@ -127,7 +132,9 @@
         #preview-screen {
             display: none;
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0; left: 0; width: 100%; 
+            height: 100vh;
+            height: 100dvh; /* Applies the same dynamic sizing to the absolute overlay */
             background: #000;
             z-index: 100;
             flex-direction: column;
@@ -141,6 +148,8 @@
 
         .preview-bar {
             padding: 20px;
+            /* Protects these buttons from mobile hardware/OS overlays */
+            padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
             display: flex;
             gap: 15px;
             background: var(--panel-bg);
