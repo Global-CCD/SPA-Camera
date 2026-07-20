@@ -11,7 +11,7 @@
             --panel-bg: #f8fafc;
             --text-primary: #0f172a;
             --text-secondary: #64748b;
-            --accent: #2563eb; /* Professional Blue */
+            --accent: #2563eb;
             --accent-hover: #1d4ed8;
             --border: #e2e8f0;
             --overlay-bg: rgba(255, 255, 255, 0.95);
@@ -55,7 +55,7 @@
             border-bottom: 1px solid var(--border);
             z-index: 10;
         }
-        
+
         header h1 {
             margin: 0;
             font-size: 15px;
@@ -94,6 +94,10 @@
             overflow: hidden;
         }
 
+        #viewport.loading {
+            pointer-events: none;
+        }
+
         video {
             width: 100%;
             height: 100%;
@@ -113,6 +117,30 @@
             text-transform: uppercase;
             font-weight: 700;
             letter-spacing: 0.5px;
+            z-index: 1;
+        }
+
+        .loading-spinner {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--accent);
+            animation: spin 1s ease-in-out infinite;
+            z-index: 2;
+        }
+
+        @keyframes spin {
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        #viewport.loading .loading-spinner {
+            display: block;
         }
 
         /* Controls Panel */
@@ -168,13 +196,19 @@
         #btn-capture:active {
             transform: scale(0.98);
         }
+        #btn-capture:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
 
         /* Overlays */
         .fullscreen-overlay {
             display: none;
             position: fixed;
-            top: 0; left: 0; width: 100%; 
-            height: 100dvh; 
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100dvh;
             background: var(--bg-color);
             z-index: 100;
             flex-direction: column;
@@ -227,6 +261,29 @@
             font-weight: 600;
             cursor: pointer;
         }
+
+        /* New button styles */
+        .btn-save-settings {
+            background: var(--accent);
+            color: white;
+            width: 100%;
+            padding: 16px;
+            border-radius: 12px;
+            border: none;
+            font-weight: 600;
+            margin-top: 30px;
+            cursor: pointer;
+        }
+
+        .btn-save-final {
+            flex: 2;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -234,13 +291,14 @@
     <header>
         <h1>Camera Studio Pro</h1>
         <div class="header-actions">
-            <button id="theme-toggle" class="icon-btn">☀️</button>
-            <button id="btn-settings-open" class="icon-btn">⚙️</button>
+            <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">☀️</button>
+            <button id="btn-settings-open" class="icon-btn" aria-label="Open settings">⚙️</button>
         </div>
     </header>
 
     <div id="viewport">
         <video id="webcam" autoplay playsinline muted></video>
+        <div class="loading-spinner"></div>
         <div id="sensor-tag">Initializing...</div>
     </div>
 
@@ -248,14 +306,14 @@
         <div class="control-group">
             <label>Resolution</label>
             <select id="res-selector">
-                <option value="high" id="opt-high">High Quality</option>
-                <option value="medium" id="opt-medium">Medium Quality</option>
-                <option value="low" id="opt-low">Low Quality</option>
-                <option value="veryLow" id="opt-veryLow">Performance Mode</option>
-                <option value="extremelyLow" id="opt-extremelyLow">Thumbnail Mode</option>
+                <option value="high">High Quality</option>
+                <option value="medium">Medium Quality</option>
+                <option value="low">Low Quality</option>
+                <option value="veryLow">Performance Mode</option>
+                <option value="extremelyLow">Thumbnail Mode</option>
             </select>
         </div>
-        
+
         <div class="control-group">
             <label>Storage Priority</label>
             <select id="storage-mode">
@@ -264,7 +322,7 @@
                 <option value="both">Download & Sync to Cloud</option>
             </select>
         </div>
-        
+
         <button id="btn-capture">Capture Image</button>
     </div>
 
@@ -275,14 +333,14 @@
         <img id="photo-output" src="" alt="Captured Image">
         <div class="preview-bar">
             <button id="btn-retake" class="secondary-btn">Discard</button>
-            <button id="btn-save-final" style="flex: 2; background: var(--accent); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer;">Manual Download</button>
+            <button id="btn-save-final" class="btn-save-final">Manual Download</button>
         </div>
     </div>
 
     <!-- Settings Overlay -->
     <div id="settings-screen" class="fullscreen-overlay">
         <div class="settings-header">API Configuration</div>
-        
+
         <div class="settings-info">
             Configure your Cloudflare Worker endpoint to enable secure background synchronization to your R2 bucket.
         </div>
@@ -297,146 +355,362 @@
             <input type="text" id="input-subdomain" placeholder="e.g. your-account.workers.dev">
         </div>
 
-        <button id="btn-save-settings" style="background: var(--accent); color: white; width: 100%; padding: 16px; border-radius: 12px; border: none; font-weight: 600; margin-top: 30px; cursor: pointer;">Save Configuration</button>
-        <button id="btn-cancel-settings" class="secondary-btn" style="width: 100%; margin-top: 12px;">Back to Camera</button>
+        <button id="btn-save-settings" class="btn-save-settings">Save Configuration</button>
+        <button id="btn-cancel-settings" class="secondary-btn">Back to Camera</button>
     </div>
 
     <script>
-        const video = document.getElementById('webcam');
-        const canvas = document.getElementById('proc-canvas');
-        const ctx = canvas.getContext('2d');
-        const sensorTag = document.getElementById('sensor-tag');
-        const resSelector = document.getElementById('res-selector');
-        const storageModeSelector = document.getElementById('storage-mode');
-        const themeToggle = document.getElementById('theme-toggle');
-        
-        const previewScreen = document.getElementById('preview-screen');
-        const photoOutput = document.getElementById('photo-output');
-        const settingsScreen = document.getElementById('settings-screen');
+        // ========== CONSTANTS ==========
+        const STORAGE_MODE = {
+            LOCAL: 'local',
+            CLOUD: 'cloud',
+            BOTH: 'both'
+        };
 
-        let configuredWorkerUrl = "";
-        const resolutions = { high: {w:0,h:0}, medium: {w:0,h:0}, low: {w:0,h:0}, veryLow: {w:0,h:0}, extremelyLow: {w:0,h:0} };
+        const RESOLUTION_MODE = {
+            HIGH: 'high',
+            MEDIUM: 'medium',
+            LOW: 'low',
+            VERY_LOW: 'veryLow',
+            EXTREMELY_LOW: 'extremelyLow'
+        };
 
-        function initTheme() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-            themeToggle.textContent = savedTheme === 'light' ? '☀️' : '🌙';
-        }
+        const JPEG_QUALITY = 0.92; // Balanced quality/size ratio
 
-        themeToggle.addEventListener('click', () => {
-            const currentTheme = document.documentElement.getAttribute('data-theme');
-            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-            document.documentElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            themeToggle.textContent = newTheme === 'light' ? '☀️' : '🌙';
-        });
+        // ========== CACHED DOM ELEMENTS ==========
+        const elements = {
+            // Theme
+            themeToggle: document.getElementById('theme-toggle'),
 
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment', width: { ideal: 4096 }, height: { ideal: 2160 } },
-                    audio: false
-                });
-                video.srcObject = stream;
-                video.onloadedmetadata = () => {
-                    const maxW = video.videoWidth;
-                    const maxH = video.videoHeight;
-                    resolutions.high = { w: maxW, h: maxH };
-                    resolutions.medium = { w: Math.floor(maxW * 0.5), h: Math.floor(maxH * 0.5) };
-                    resolutions.low = { w: Math.floor(maxW * 0.25), h: Math.floor(maxH * 0.25) };
-                    resolutions.veryLow = { w: Math.floor(maxW * 0.125), h: Math.floor(maxH * 0.125) };
-                    resolutions.extremelyLow = { w: Math.floor(maxW * 0.0625), h: Math.floor(maxH * 0.0625) };
-                    sensorTag.innerText = `${maxW}×${maxH} PRO SENSOR`;
-                };
-            } catch (err) {
-                sensorTag.innerText = "CAMERA ERROR";
-            }
-        }
+            // Camera
+            video: document.getElementById('webcam'),
+            canvas: document.getElementById('proc-canvas'),
+            ctx: document.getElementById('proc-canvas').getContext('2d'),
+            sensorTag: document.getElementById('sensor-tag'),
+            viewport: document.getElementById('viewport'),
 
-        function loadSettings() {
-            const savedWorker = localStorage.getItem('cf_worker_name') || "";
-            const savedSubdomain = localStorage.getItem('cf_subdomain') || "";
-            document.getElementById('input-worker-name').value = savedWorker;
-            document.getElementById('input-subdomain').value = savedSubdomain;
-            if (savedWorker && savedSubdomain) {
-                const cleanSub = savedSubdomain.replace('https://', '').replace('.workers.dev', '');
-                configuredWorkerUrl = `https://${savedWorker}.${cleanSub}.workers.dev`;
-            }
-        }
+            // Controls
+            resSelector: document.getElementById('res-selector'),
+            storageModeSelector: document.getElementById('storage-mode'),
+            captureBtn: document.getElementById('btn-capture'),
 
-        // --- NEW SECURE DOWNLOAD HELPER ---
+            // Overlays
+            previewScreen: document.getElementById('preview-screen'),
+            photoOutput: document.getElementById('photo-output'),
+            settingsScreen: document.getElementById('settings-screen'),
+
+            // Settings
+            inputWorkerName: document.getElementById('input-worker-name'),
+            inputSubdomain: document.getElementById('input-subdomain'),
+            btnSettingsOpen: document.getElementById('btn-settings-open'),
+            btnSaveSettings: document.getElementById('btn-save-settings'),
+            btnCancelSettings: document.getElementById('btn-cancel-settings'),
+
+            // Preview Actions
+            btnRetake: document.getElementById('btn-retake'),
+            btnSaveFinal: document.getElementById('btn-save-final')
+        };
+
+        // ========== STATE MANAGEMENT ==========
+        const state = {
+            configuredWorkerUrl: "",
+            resolutions: {
+                [RESOLUTION_MODE.HIGH]: { w: 0, h: 0 },
+                [RESOLUTION_MODE.MEDIUM]: { w: 0, h: 0 },
+                [RESOLUTION_MODE.LOW]: { w: 0, h: 0 },
+                [RESOLUTION_MODE.VERY_LOW]: { w: 0, h: 0 },
+                [RESOLUTION_MODE.EXTREMELY_LOW]: { w: 0, h: 0 }
+            },
+            isCameraInitialized: false,
+            cameraStream: null
+        };
+
+        // ========== UTILITY FUNCTIONS ==========
+        /**
+         * Triggers a file download with proper cleanup
+         * @param {string} url - The object URL to download
+         * @param {string} filename - The name for the downloaded file
+         */
         function triggerDownload(url, filename) {
             const link = document.createElement('a');
             link.href = url;
             link.download = filename;
-            // Key fix for Opera/Mobile: opens in a new tab if it can't force a download
-            link.target = '_blank'; 
             document.body.appendChild(link);
-            link.click();
-            // Remove from DOM after short delay to ensure browser handles it
-            setTimeout(() => document.body.removeChild(link), 100);
+            try {
+                link.click();
+            } catch (e) {
+                console.error("Download failed:", e);
+                alert("Download failed. Please try again.");
+            } finally {
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                }, 100);
+            }
         }
 
-        document.getElementById('btn-settings-open').addEventListener('click', () => settingsScreen.style.display = 'flex');
-        document.getElementById('btn-cancel-settings').addEventListener('click', () => settingsScreen.style.display = 'none');
-        document.getElementById('btn-save-settings').addEventListener('click', () => {
-            localStorage.setItem('cf_worker_name', document.getElementById('input-worker-name').value.trim());
-            localStorage.setItem('cf_subdomain', document.getElementById('input-subdomain').value.trim());
-            loadSettings();
-            settingsScreen.style.display = 'none';
-        });
+        /**
+         * Validates Cloudflare Worker URL components
+         * @param {string} workerName - The worker ID
+         * @param {string} subdomain - The subdomain
+         * @returns {boolean} - True if valid
+         */
+        function validateWorkerUrl(workerName, subdomain) {
+            if (!workerName || !subdomain) return false;
+            const cleanSub = subdomain.replace(/^https?:\/\//, '').replace(/\.workers\.dev$/, '');
+            return /^[a-zA-Z0-9-]+$/.test(workerName) && /^[a-zA-Z0-9.-]+$/.test(cleanSub);
+        }
 
-        document.getElementById('btn-capture').addEventListener('click', () => {
-            const mode = resSelector.value;
-            const target = resolutions[mode];
-            const storageMode = storageModeSelector.value;
+        /**
+         * Shows/hides loading state for the viewport
+         * @param {boolean} isLoading - Whether to show loading state
+         */
+        function setLoadingState(isLoading) {
+            elements.viewport.classList.toggle('loading', isLoading);
+        }
 
-            if ((storageMode === 'cloud' || storageMode === 'both') && !configuredWorkerUrl) {
+        // ========== CORE FUNCTIONALITY ==========
+        /**
+         * Initializes the theme based on localStorage
+         */
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            elements.themeToggle.textContent = savedTheme === 'light' ? '☀️' : '🌙';
+        }
+
+        /**
+         * Toggles between light and dark theme
+         */
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            elements.themeToggle.textContent = newTheme === 'light' ? '☀️' : '🌙';
+        }
+
+        /**
+         * Loads saved Cloudflare Worker settings from localStorage
+         */
+        function loadSettings() {
+            const savedWorker = localStorage.getItem('cf_worker_name') || "";
+            const savedSubdomain = localStorage.getItem('cf_subdomain') || "";
+            elements.inputWorkerName.value = savedWorker;
+            elements.inputSubdomain.value = savedSubdomain;
+
+            if (savedWorker && savedSubdomain) {
+                const cleanSub = savedSubdomain.replace(/^https?:\/\//, '').replace(/\.workers\.dev$/, '');
+                state.configuredWorkerUrl = `https://${savedWorker}.${cleanSub}.workers.dev`;
+            } else {
+                state.configuredWorkerUrl = "";
+            }
+        }
+
+        /**
+         * Starts the camera and initializes resolutions
+         */
+        async function startCamera() {
+            if (state.isCameraInitialized) return;
+
+            setLoadingState(true);
+            elements.sensorTag.textContent = "Initializing...";
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 4096 },
+                        height: { ideal: 2160 }
+                    },
+                    audio: false
+                });
+
+                elements.video.srcObject = stream;
+                state.cameraStream = stream;
+
+                await new Promise((resolve) => {
+                    elements.video.onloadedmetadata = () => {
+                        const maxW = elements.video.videoWidth;
+                        const maxH = elements.video.videoHeight;
+
+                        // Calculate resolutions based on camera capabilities
+                        state.resolutions[RESOLUTION_MODE.HIGH] = { w: maxW, h: maxH };
+                        state.resolutions[RESOLUTION_MODE.MEDIUM] = { w: Math.floor(maxW * 0.5), h: Math.floor(maxH * 0.5) };
+                        state.resolutions[RESOLUTION_MODE.LOW] = { w: Math.floor(maxW * 0.25), h: Math.floor(maxH * 0.25) };
+                        state.resolutions[RESOLUTION_MODE.VERY_LOW] = { w: Math.floor(maxW * 0.125), h: Math.floor(maxH * 0.125) };
+                        state.resolutions[RESOLUTION_MODE.EXTREMELY_LOW] = { w: Math.floor(maxW * 0.0625), h: Math.floor(maxH * 0.0625) };
+
+                        elements.sensorTag.textContent = `${maxW}×${maxH} PRO SENSOR`;
+                        state.isCameraInitialized = true;
+                        resolve();
+                    };
+                });
+            } catch (err) {
+                elements.sensorTag.textContent = "CAMERA ERROR: " + err.message;
+                console.error("Camera initialization failed:", err);
+                throw err;
+            } finally {
+                setLoadingState(false);
+            }
+        }
+
+        /**
+         * Stops the camera stream
+         */
+        function stopCamera() {
+            if (state.cameraStream) {
+                state.cameraStream.getTracks().forEach(track => track.stop());
+                state.cameraStream = null;
+            }
+            state.isCameraInitialized = false;
+        }
+
+        /**
+         * Handles the capture process
+         */
+        async function handleCapture() {
+            const mode = elements.resSelector.value;
+            const target = state.resolutions[mode];
+            const storageMode = elements.storageModeSelector.value;
+
+            // Validate cloud storage requirements
+            if ((storageMode === STORAGE_MODE.CLOUD || storageMode === STORAGE_MODE.BOTH) && !state.configuredWorkerUrl) {
                 alert("Please configure API settings.");
-                settingsScreen.style.display = 'flex';
+                elements.settingsScreen.style.display = 'flex';
                 return;
             }
 
-            canvas.width = target.w;
-            canvas.height = target.h;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // Disable button during processing
+            elements.captureBtn.disabled = true;
+            elements.captureBtn.textContent = "Processing...";
 
-            const captureBtn = document.getElementById('btn-capture');
-            captureBtn.disabled = true;
-            captureBtn.textContent = "Processing...";
+            try {
+                // Set canvas dimensions and draw image
+                elements.canvas.width = target.w;
+                elements.canvas.height = target.h;
+                elements.ctx.drawImage(
+                    elements.video,
+                    0, 0,
+                    elements.canvas.width,
+                    elements.canvas.height
+                );
 
-            canvas.toBlob(async (blob) => {
+                // Convert canvas to blob asynchronously
+                const blob = await new Promise((resolve) => {
+                    elements.canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY);
+                });
+
+                // Generate filename with timestamp
                 const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
                 const filename = `IMG_${ts}_${target.w}x${target.h}.jpg`;
                 const localUrl = URL.createObjectURL(blob);
 
                 try {
-                    if (storageMode === 'cloud' || storageMode === 'both') {
-                        await fetch(`${configuredWorkerUrl}/${filename}`, { method: 'PUT', body: blob });
+                    // Handle cloud storage if needed
+                    if (storageMode === STORAGE_MODE.CLOUD || storageMode === STORAGE_MODE.BOTH) {
+                        await fetch(`${state.configuredWorkerUrl}/${filename}`, {
+                            method: 'PUT',
+                            body: blob
+                        });
                     }
-                    if (storageMode === 'local' || storageMode === 'both') {
+
+                    // Handle local download if needed
+                    if (storageMode === STORAGE_MODE.LOCAL || storageMode === STORAGE_MODE.BOTH) {
                         triggerDownload(localUrl, filename);
                     }
-                    photoOutput.src = localUrl;
-                    previewScreen.style.display = 'flex';
+
+                    // Show preview
+                    elements.photoOutput.src = localUrl;
+                    elements.previewScreen.style.display = 'flex';
                 } catch (e) {
+                    console.error("Capture error:", e);
                     alert("Sync Error: " + e.message);
                 } finally {
-                    captureBtn.disabled = false;
-                    captureBtn.textContent = "Capture Image";
+                    // Clean up the object URL
+                    URL.revokeObjectURL(localUrl);
                 }
-            }, 'image/jpeg', 0.92);
-        });
+            } catch (e) {
+                console.error("Capture failed:", e);
+                alert("Capture failed: " + e.message);
+            } finally {
+                // Re-enable capture button
+                elements.captureBtn.disabled = false;
+                elements.captureBtn.textContent = "Capture Image";
+            }
+        }
 
-        document.getElementById('btn-retake').addEventListener('click', () => previewScreen.style.display = 'none');
-        document.getElementById('btn-save-final').addEventListener('click', () => {
-            triggerDownload(photoOutput.src, `Export_${Date.now()}.jpg`);
-        });
+        /**
+         * Handles saving the final image
+         */
+        function handleSaveFinal() {
+            if (!elements.photoOutput.src) return;
 
-        window.addEventListener('DOMContentLoaded', () => {
+            const url = elements.photoOutput.src;
+            const filename = `Export_${Date.now()}.jpg`;
+            triggerDownload(url, filename);
+        }
+
+        // ========== EVENT LISTENERS ==========
+        function setupEventListeners() {
+            // Theme toggle
+            elements.themeToggle.addEventListener('click', toggleTheme);
+
+            // Settings
+            elements.btnSettingsOpen.addEventListener('click', () => {
+                elements.settingsScreen.style.display = 'flex';
+            });
+
+            elements.btnCancelSettings.addEventListener('click', () => {
+                elements.settingsScreen.style.display = 'none';
+            });
+
+            elements.btnSaveSettings.addEventListener('click', () => {
+                const workerName = elements.inputWorkerName.value.trim();
+                const subdomain = elements.inputSubdomain.value.trim();
+
+                if (!validateWorkerUrl(workerName, subdomain)) {
+                    alert("Invalid Worker ID or Subdomain. Use only alphanumeric characters, hyphens, and periods.");
+                    return;
+                }
+
+                localStorage.setItem('cf_worker_name', workerName);
+                localStorage.setItem('cf_subdomain', subdomain);
+                loadSettings();
+                elements.settingsScreen.style.display = 'none';
+            });
+
+            // Capture
+            elements.captureBtn.addEventListener('click', handleCapture);
+
+            // Preview actions
+            elements.btnRetake.addEventListener('click', () => {
+                elements.previewScreen.style.display = 'none';
+                // Clean up the preview image
+                if (elements.photoOutput.src) {
+                    URL.revokeObjectURL(elements.photoOutput.src);
+                    elements.photoOutput.src = "";
+                }
+            });
+
+            elements.btnSaveFinal.addEventListener('click', handleSaveFinal);
+        }
+
+        // ========== INITIALIZATION ==========
+        document.addEventListener('DOMContentLoaded', () => {
             initTheme();
-            startCamera();
             loadSettings();
+            setupEventListeners();
+            startCamera().catch(console.error);
+        });
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            stopCamera();
+            // Clean up any remaining object URLs
+            if (elements.photoOutput.src) {
+                URL.revokeObjectURL(elements.photoOutput.src);
+            }
         });
     </script>
 </body>
