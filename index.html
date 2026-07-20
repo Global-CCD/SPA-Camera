@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- viewport-fit=cover allows safe-area inset detection for modern mobile devices -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Pro Multi-Res Camera</title>
@@ -11,9 +10,10 @@
             --panel-bg: #1a1a1a;
             --text-primary: #ffffff;
             --text-secondary: #a0a0a0;
-            --accent: #00e676; /* Vibrant Green */
+            --accent: #00e676; 
             --accent-hover: #00c853;
             --danger: #ff5252;
+            --border: #333333;
         }
 
         body {
@@ -24,20 +24,36 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             display: flex;
             flex-direction: column;
-            height: 100vh; /* Fallback for older browsers */
-            height: 100dvh; /* Fixes browser navigation bar covering the bottom */
+            height: 100vh; 
+            height: 100dvh; 
             overflow: hidden;
         }
 
         /* Header Info */
         header {
             padding: 15px;
-            padding-top: calc(15px + env(safe-area-inset-top, 0px)); /* Accommodate top notch */
-            text-align: center;
-            font-size: 14px;
-            font-weight: 600;
-            background: rgba(0,0,0,0.4);
-            border-bottom: 1px solid #333;
+            padding-top: calc(15px + env(safe-area-inset-top, 0px)); 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.6);
+            border-bottom: 1px solid var(--border);
+            z-index: 10;
+        }
+        
+        header h1 {
+            margin: 0;
+            font-size: 16px;
+        }
+
+        #btn-settings-open {
+            background: transparent;
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 4px;
+            cursor: pointer;
         }
 
         /* Viewfinder Section */
@@ -75,9 +91,8 @@
         #controls-panel {
             background-color: var(--panel-bg);
             padding: 20px 20px 35px 20px;
-            /* Prevents the home swipe-indicator overlay from blocking the button */
             padding-bottom: calc(35px + env(safe-area-inset-bottom, 0px));
-            border-top: 1px solid #333;
+            border-top: 1px solid var(--border);
             display: flex;
             flex-direction: column;
             gap: 15px;
@@ -96,7 +111,7 @@
             font-weight: bold;
         }
 
-        select {
+        select, input[type="text"] {
             width: 100%;
             padding: 14px;
             border-radius: 8px;
@@ -105,6 +120,11 @@
             border: 1px solid #444;
             font-size: 16px;
             appearance: none;
+            box-sizing: border-box;
+        }
+        
+        input[type="text"]::placeholder {
+            color: #777;
         }
 
         button {
@@ -128,8 +148,8 @@
             background-color: var(--accent-hover);
         }
 
-        /* Preview Overlay */
-        #preview-screen {
+        /* Overlay Screens (Preview & Settings) */
+        .fullscreen-overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; 
@@ -140,6 +160,48 @@
             flex-direction: column;
         }
 
+        /* Settings Screen Specifics */
+        #settings-screen {
+            background: var(--bg-color);
+            padding: 20px;
+            padding-top: calc(20px + env(safe-area-inset-top, 0px));
+            padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+            overflow-y: auto;
+        }
+        
+        .settings-header {
+            font-size: 20px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+        }
+
+        .settings-info {
+            background: rgba(0, 230, 118, 0.1);
+            border: 1px solid var(--accent);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #e0e0e0;
+            margin-bottom: 20px;
+        }
+
+        #btn-save-settings {
+            background: var(--accent);
+            color: #000;
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        #btn-cancel-settings {
+            background: #333;
+            color: #fff;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        /* Preview Screen Specifics */
         #photo-output {
             flex: 1;
             object-fit: contain;
@@ -148,7 +210,6 @@
 
         .preview-bar {
             padding: 20px;
-            /* Protects these buttons from mobile hardware/OS overlays */
             padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
             display: flex;
             gap: 15px;
@@ -162,7 +223,10 @@
 </head>
 <body>
 
-    <header>Multi-Res Camera Studio</header>
+    <header>
+        <h1>Camera Studio</h1>
+        <button id="btn-settings-open">⚙️ Setup API</button>
+    </header>
 
     <div id="viewport">
         <video id="webcam" autoplay playsinline muted></video>
@@ -183,16 +247,37 @@
         <button id="btn-capture">CAPTURE IMAGE</button>
     </div>
 
-    <!-- Processing Canvas -->
     <canvas id="proc-canvas" style="display: none;"></canvas>
 
-    <!-- Preview Screen -->
-    <div id="preview-screen">
+    <!-- Preview Screen Overlay -->
+    <div id="preview-screen" class="fullscreen-overlay">
         <img id="photo-output" src="" alt="Captured Image">
         <div class="preview-bar">
             <button id="btn-retake">RETAKE</button>
             <button id="btn-save">SAVE TO DEVICE</button>
         </div>
+    </div>
+
+    <!-- Settings Screen Overlay -->
+    <div id="settings-screen" class="fullscreen-overlay">
+        <div class="settings-header">Cloudflare R2 Setup</div>
+        
+        <div class="settings-info">
+            <strong>Secure Uploads:</strong> To keep your Cloudflare account safe, your R2 Bucket Name (<i>spa-camera-demo1</i>) and Secret Keys are safely hidden inside your Cloudflare Worker. Only provide your Worker URL below.
+        </div>
+
+        <div class="control-group" style="margin-bottom: 15px;">
+            <label>Cloudflare Worker Name</label>
+            <input type="text" id="input-worker-name" placeholder="e.g. orange-leaf-8368">
+        </div>
+
+        <div class="control-group">
+            <label>Worker Subdomain</label>
+            <input type="text" id="input-subdomain" placeholder="e.g. your-account-id.workers.dev">
+        </div>
+
+        <button id="btn-save-settings">SAVE SETUP</button>
+        <button id="btn-cancel-settings">CANCEL</button>
     </div>
 
     <script>
@@ -201,13 +286,14 @@
         const ctx = canvas.getContext('2d');
         const sensorTag = document.getElementById('sensor-tag');
         const resSelector = document.getElementById('res-selector');
+        
         const previewScreen = document.getElementById('preview-screen');
         const photoOutput = document.getElementById('photo-output');
+        const settingsScreen = document.getElementById('settings-screen');
 
-        // Cloudflare Worker URL - UPDATE THIS AFTER DEPLOYING WORKER
-        const WORKER_BASE_URL = "https://YOUR_WORKER_URL_HERE.workers.dev"; 
+        // Dynamic Configuration State
+        let configuredWorkerUrl = "";
 
-        // Resolution Data Store
         const resolutions = {
             high: { w: 0, h: 0 },
             medium: { w: 0, h: 0 },
@@ -216,25 +302,19 @@
             extremelyLow: { w: 0, h: 0 }
         };
 
+        // --- CAMERA INITIALIZATION ---
         async function startCamera() {
             try {
-                // Request 4K ideal to force the browser to reveal max hardware sensor capability
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: 'environment', 
-                        width: { ideal: 4096 }, 
-                        height: { ideal: 2160 } 
-                    },
+                    video: { facingMode: 'environment', width: { ideal: 4096 }, height: { ideal: 2160 } },
                     audio: false
                 });
 
                 video.srcObject = stream;
-
                 video.onloadedmetadata = () => {
                     const maxW = video.videoWidth;
                     const maxH = video.videoHeight;
 
-                    // Calculate the 5 tiers of resolution
                     resolutions.high = { w: maxW, h: maxH };
                     resolutions.medium = { w: Math.floor(maxW * 0.5), h: Math.floor(maxH * 0.5) };
                     resolutions.low = { w: Math.floor(maxW * 0.25), h: Math.floor(maxH * 0.25) };
@@ -259,8 +339,56 @@
             document.getElementById(id).textContent = `${label} (${res.w} x ${res.h})`;
         }
 
-        // Capture Action & Auto-Upload to Cloudflare R2
+        // --- SETTINGS MANAGEMENT (Local Storage) ---
+        function loadSettings() {
+            const savedWorker = localStorage.getItem('cf_worker_name') || "";
+            const savedSubdomain = localStorage.getItem('cf_subdomain') || "";
+
+            document.getElementById('input-worker-name').value = savedWorker;
+            document.getElementById('input-subdomain').value = savedSubdomain;
+
+            if (savedWorker && savedSubdomain) {
+                // Ensure subdomain doesn't accidentally contain https:// or double .workers.dev
+                const cleanSubdomain = savedSubdomain.replace('https://', '').replace('.workers.dev', '');
+                configuredWorkerUrl = `https://${savedWorker}.${cleanSubdomain}.workers.dev`;
+            }
+        }
+
+        document.getElementById('btn-settings-open').addEventListener('click', () => {
+            loadSettings(); // Refresh inputs
+            settingsScreen.style.display = 'flex';
+        });
+
+        document.getElementById('btn-cancel-settings').addEventListener('click', () => {
+            settingsScreen.style.display = 'none';
+        });
+
+        document.getElementById('btn-save-settings').addEventListener('click', () => {
+            const workerName = document.getElementById('input-worker-name').value.trim();
+            const subdomain = document.getElementById('input-subdomain').value.trim();
+
+            if (!workerName || !subdomain) {
+                alert("Please fill in both fields.");
+                return;
+            }
+
+            localStorage.setItem('cf_worker_name', workerName);
+            localStorage.setItem('cf_subdomain', subdomain);
+            
+            loadSettings(); // Updates internal worker URL variable
+            settingsScreen.style.display = 'none';
+            alert("Settings Saved!");
+        });
+
+        // --- CAPTURE & UPLOAD LOGIC ---
         document.getElementById('btn-capture').addEventListener('click', () => {
+            // Check if settings are configured first!
+            if (!configuredWorkerUrl) {
+                alert("⚠️ Please configure your Cloudflare Worker details in the 'Setup API' menu first.");
+                settingsScreen.style.display = 'flex';
+                return;
+            }
+
             const mode = resSelector.value;
             const target = resolutions[mode];
 
@@ -268,40 +396,36 @@
             canvas.height = target.h;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Update UI State
             const captureBtn = document.getElementById('btn-capture');
             captureBtn.textContent = "UPLOADING...";
             captureBtn.style.backgroundColor = "var(--text-secondary)";
             captureBtn.disabled = true;
 
-            // Convert to binary Blob and upload
             canvas.toBlob(async (blob) => {
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
                 const filename = `Photo_${mode}_${target.w}x${target.h}_${timestamp}.jpg`;
                 
-                const workerUrl = `${WORKER_BASE_URL}/${filename}`;
+                // Use dynamically configured URL!
+                const uploadEndpoint = `${configuredWorkerUrl}/${filename}`;
 
                 try {
-                    const response = await fetch(workerUrl, {
+                    const response = await fetch(uploadEndpoint, {
                         method: 'PUT',
                         body: blob, 
                         headers: { 'Content-Type': 'image/jpeg' }
                     });
 
                     if (response.ok) {
-                        // Display the preview via local object URL
                         photoOutput.src = URL.createObjectURL(blob);
                         previewScreen.style.display = 'flex';
-                        console.log("Successfully uploaded to R2:", filename);
                     } else {
                         alert("Upload failed. Server responded with: " + response.status);
                     }
                     
                 } catch (error) {
                     console.error("Upload error:", error);
-                    alert("Network error. Could not upload photo.");
+                    alert("Network error. Make sure your Worker URL is correct in settings.");
                 } finally {
-                    // Reset Button State
                     captureBtn.textContent = "CAPTURE IMAGE";
                     captureBtn.style.backgroundColor = "var(--accent)";
                     captureBtn.disabled = false;
@@ -310,12 +434,11 @@
             }, 'image/jpeg', 0.92);
         });
 
-        // Retake
+        // Retake and Local Save
         document.getElementById('btn-retake').addEventListener('click', () => {
             previewScreen.style.display = 'none';
         });
 
-        // Save to Local Device Backup
         document.getElementById('btn-save').addEventListener('click', () => {
             const mode = resSelector.value;
             const res = resolutions[mode];
@@ -323,14 +446,16 @@
             
             const link = document.createElement('a');
             link.download = `Photo_${mode}_${res.w}x${res.h}_${timestamp}.jpg`;
-            link.href = photoOutput.src; // Uses the same local blob URL
+            link.href = photoOutput.src;
             link.click();
-
             previewScreen.style.display = 'none';
         });
 
         // Run on load
-        window.addEventListener('DOMContentLoaded', startCamera);
+        window.addEventListener('DOMContentLoaded', () => {
+            startCamera();
+            loadSettings();
+        });
     </script>
 </body>
 </html>
