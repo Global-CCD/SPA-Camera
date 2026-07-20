@@ -152,11 +152,6 @@
             outline: none;
         }
 
-        select:focus, input:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
-        }
-
         #btn-capture {
             background-color: var(--accent);
             color: white;
@@ -195,7 +190,6 @@
             font-size: 18px;
             font-weight: 700;
             margin-bottom: 24px;
-            color: var(--text-primary);
         }
 
         .settings-info {
@@ -231,6 +225,7 @@
             padding: 14px;
             border-radius: 10px;
             font-weight: 600;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -239,8 +234,8 @@
     <header>
         <h1>Camera Studio Pro</h1>
         <div class="header-actions">
-            <button id="theme-toggle" class="icon-btn" title="Toggle Theme">☀️</button>
-            <button id="btn-settings-open" class="icon-btn" title="Setup API">⚙️</button>
+            <button id="theme-toggle" class="icon-btn">☀️</button>
+            <button id="btn-settings-open" class="icon-btn">⚙️</button>
         </div>
     </header>
 
@@ -280,7 +275,7 @@
         <img id="photo-output" src="" alt="Captured Image">
         <div class="preview-bar">
             <button id="btn-retake" class="secondary-btn">Discard</button>
-            <button id="btn-save-final" style="flex: 2; background: var(--accent); color: white; border: none; border-radius: 10px; font-weight: 600;">Manual Download</button>
+            <button id="btn-save-final" style="flex: 2; background: var(--accent); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer;">Manual Download</button>
         </div>
     </div>
 
@@ -302,7 +297,7 @@
             <input type="text" id="input-subdomain" placeholder="e.g. your-account.workers.dev">
         </div>
 
-        <button id="btn-save-settings" style="background: var(--accent); color: white; width: 100%; padding: 16px; border-radius: 12px; border: none; font-weight: 600; margin-top: 30px;">Save Configuration</button>
+        <button id="btn-save-settings" style="background: var(--accent); color: white; width: 100%; padding: 16px; border-radius: 12px; border: none; font-weight: 600; margin-top: 30px; cursor: pointer;">Save Configuration</button>
         <button id="btn-cancel-settings" class="secondary-btn" style="width: 100%; margin-top: 12px;">Back to Camera</button>
     </div>
 
@@ -322,7 +317,6 @@
         let configuredWorkerUrl = "";
         const resolutions = { high: {w:0,h:0}, medium: {w:0,h:0}, low: {w:0,h:0}, veryLow: {w:0,h:0}, extremelyLow: {w:0,h:0} };
 
-        // --- THEME MANAGEMENT ---
         function initTheme() {
             const savedTheme = localStorage.getItem('theme') || 'light';
             document.documentElement.setAttribute('data-theme', savedTheme);
@@ -337,59 +331,54 @@
             themeToggle.textContent = newTheme === 'light' ? '☀️' : '🌙';
         });
 
-        // --- CAMERA LOGIC ---
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'environment', width: { ideal: 4096 }, height: { ideal: 2160 } },
                     audio: false
                 });
-
                 video.srcObject = stream;
                 video.onloadedmetadata = () => {
                     const maxW = video.videoWidth;
                     const maxH = video.videoHeight;
-                    
                     resolutions.high = { w: maxW, h: maxH };
                     resolutions.medium = { w: Math.floor(maxW * 0.5), h: Math.floor(maxH * 0.5) };
                     resolutions.low = { w: Math.floor(maxW * 0.25), h: Math.floor(maxH * 0.25) };
                     resolutions.veryLow = { w: Math.floor(maxW * 0.125), h: Math.floor(maxH * 0.125) };
                     resolutions.extremelyLow = { w: Math.floor(maxW * 0.0625), h: Math.floor(maxH * 0.0625) };
-
-                    Object.keys(resolutions).forEach(key => {
-                        const opt = document.getElementById(`opt-${key}`);
-                        if(opt) opt.textContent = `${opt.textContent.split('(')[0]} (${resolutions[key].w}×${resolutions[key].h})`;
-                    });
-
                     sensorTag.innerText = `${maxW}×${maxH} PRO SENSOR`;
                 };
             } catch (err) {
                 sensorTag.innerText = "CAMERA ERROR";
-                console.error(err);
             }
         }
 
-        // --- DATA MANAGEMENT ---
         function loadSettings() {
             const savedWorker = localStorage.getItem('cf_worker_name') || "";
             const savedSubdomain = localStorage.getItem('cf_subdomain') || "";
-            const savedMode = localStorage.getItem('storage_mode') || 'local';
-
             document.getElementById('input-worker-name').value = savedWorker;
             document.getElementById('input-subdomain').value = savedSubdomain;
-            storageModeSelector.value = savedMode;
-
             if (savedWorker && savedSubdomain) {
                 const cleanSub = savedSubdomain.replace('https://', '').replace('.workers.dev', '');
                 configuredWorkerUrl = `https://${savedWorker}.${cleanSub}.workers.dev`;
             }
         }
 
-        storageModeSelector.addEventListener('change', (e) => localStorage.setItem('storage_mode', e.target.value));
+        // --- NEW SECURE DOWNLOAD HELPER ---
+        function triggerDownload(url, filename) {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            // Key fix for Opera/Mobile: opens in a new tab if it can't force a download
+            link.target = '_blank'; 
+            document.body.appendChild(link);
+            link.click();
+            // Remove from DOM after short delay to ensure browser handles it
+            setTimeout(() => document.body.removeChild(link), 100);
+        }
 
         document.getElementById('btn-settings-open').addEventListener('click', () => settingsScreen.style.display = 'flex');
         document.getElementById('btn-cancel-settings').addEventListener('click', () => settingsScreen.style.display = 'none');
-
         document.getElementById('btn-save-settings').addEventListener('click', () => {
             localStorage.setItem('cf_worker_name', document.getElementById('input-worker-name').value.trim());
             localStorage.setItem('cf_subdomain', document.getElementById('input-subdomain').value.trim());
@@ -397,14 +386,13 @@
             settingsScreen.style.display = 'none';
         });
 
-        // --- CAPTURE & STORAGE ---
         document.getElementById('btn-capture').addEventListener('click', () => {
             const mode = resSelector.value;
             const target = resolutions[mode];
             const storageMode = storageModeSelector.value;
 
             if ((storageMode === 'cloud' || storageMode === 'both') && !configuredWorkerUrl) {
-                alert("Please configure API settings for cloud storage.");
+                alert("Please configure API settings.");
                 settingsScreen.style.display = 'flex';
                 return;
             }
@@ -427,15 +415,12 @@
                         await fetch(`${configuredWorkerUrl}/${filename}`, { method: 'PUT', body: blob });
                     }
                     if (storageMode === 'local' || storageMode === 'both') {
-                        const link = document.createElement('a');
-                        link.download = filename;
-                        link.href = localUrl;
-                        link.click();
+                        triggerDownload(localUrl, filename);
                     }
                     photoOutput.src = localUrl;
                     previewScreen.style.display = 'flex';
                 } catch (e) {
-                    alert("Capture failed: " + e.message);
+                    alert("Sync Error: " + e.message);
                 } finally {
                     captureBtn.disabled = false;
                     captureBtn.textContent = "Capture Image";
@@ -445,10 +430,7 @@
 
         document.getElementById('btn-retake').addEventListener('click', () => previewScreen.style.display = 'none');
         document.getElementById('btn-save-final').addEventListener('click', () => {
-            const link = document.createElement('a');
-            link.download = `Manual_Export_${Date.now()}.jpg`;
-            link.href = photoOutput.src;
-            link.click();
+            triggerDownload(photoOutput.src, `Export_${Date.now()}.jpg`);
         });
 
         window.addEventListener('DOMContentLoaded', () => {
