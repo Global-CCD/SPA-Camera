@@ -9,6 +9,7 @@ A lightweight, single-page progressive web application (PWA) that allows users t
 **Cloudflare Demos**
 - Main Branch - https://spa-camera.pages.dev/
 - v1 release - https://bce4d25f.spa-camera.pages.dev/
+- v2 release - https://682028dd.spa-camera.pages.dev/
 
 ## ✨ Features
 
