@@ -3,31 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Multi-Res Camera App</title>
+    <title>Pro Multi-Res Camera</title>
     <style>
         :root {
-            --bg-color: #121212;
-            --panel-bg: #1e1e1e;
-            --text-color: #ffffff;
-            --primary: #bb86fc;
-            --primary-hover: #9965f4;
-            --danger: #cf6679;
+            --bg-color: #0f0f0f;
+            --panel-bg: #1a1a1a;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --accent: #00e676; /* Vibrant Green */
+            --accent-hover: #00c853;
+            --danger: #ff5252;
         }
 
         body {
             margin: 0;
             padding: 0;
             background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             display: flex;
             flex-direction: column;
             height: 100vh;
             overflow: hidden;
         }
 
+        /* Header Info */
+        header {
+            padding: 15px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            background: rgba(0,0,0,0.4);
+            border-bottom: 1px solid #333;
+        }
+
         /* Viewfinder Section */
-        #viewfinder-container {
+        #viewport {
             flex: 1;
             position: relative;
             background-color: #000;
@@ -40,264 +51,242 @@
         video {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* Cover the whole area like a native camera app */
+            object-fit: cover;
         }
 
-        /* Status overlay */
-        #status-overlay {
+        #sensor-tag {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.6);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 12px;
-            pointer-events: none;
+            top: 15px;
+            left: 15px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: 1px solid var(--accent);
         }
 
-        /* Controls Section */
-        #controls {
+        /* Controls Area */
+        #controls-panel {
             background-color: var(--panel-bg);
-            padding: 20px;
-            border-top-left-radius: 16px;
-            border-top-right-radius: 16px;
-            box-shadow: 0 -4px 10px rgba(0,0,0,0.5);
+            padding: 20px 20px 35px 20px;
+            border-top: 1px solid #333;
             display: flex;
             flex-direction: column;
             gap: 15px;
         }
 
-        .control-row {
+        .control-group {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 10px;
+            flex-direction: column;
+            gap: 8px;
         }
 
-        select, button {
-            padding: 12px;
-            border-radius: 8px;
-            border: none;
-            font-size: 16px;
+        label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
             font-weight: bold;
-            cursor: pointer;
-            outline: none;
         }
 
         select {
-            flex: 1;
-            background-color: #333;
+            width: 100%;
+            padding: 14px;
+            border-radius: 8px;
+            background-color: #2c2c2c;
             color: white;
+            border: 1px solid #444;
+            font-size: 16px;
             appearance: none;
         }
 
         button {
-            transition: background-color 0.2s;
+            padding: 16px;
+            border-radius: 50px;
+            border: none;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
         #btn-capture {
-            background-color: var(--primary);
+            background-color: var(--accent);
             color: #000;
-            flex: 2;
+            box-shadow: 0 4px 15px rgba(0, 230, 118, 0.3);
         }
 
         #btn-capture:active {
-            background-color: var(--primary-hover);
+            transform: scale(0.96);
+            background-color: var(--accent-hover);
         }
 
-        /* Results / Gallery Section */
-        #preview-container {
+        /* Preview Overlay */
+        #preview-screen {
             display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            z-index: 100;
             flex-direction: column;
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-color: var(--bg-color);
-            z-index: 10;
         }
 
-        #photo-preview {
+        #photo-output {
             flex: 1;
             object-fit: contain;
             width: 100%;
-            height: 80%;
         }
 
-        .preview-controls {
+        .preview-bar {
             padding: 20px;
             display: flex;
-            gap: 10px;
-            background-color: var(--panel-bg);
+            gap: 15px;
+            background: var(--panel-bg);
         }
 
-        #btn-save {
-            background-color: var(--primary);
-            color: #000;
-            flex: 1;
-        }
-        
-        #btn-retake {
-            background-color: #333;
-            color: white;
-            flex: 1;
-        }
+        #btn-save { background: var(--accent); color: #000; flex: 1; }
+        #btn-retake { background: #333; color: #fff; flex: 1; }
+
     </style>
 </head>
 <body>
 
-    <!-- Camera Viewfinder -->
-    <div id="viewfinder-container">
-        <!-- playsinline is required for iOS to not open full screen media player -->
-        <video id="camera-stream" autoplay playsinline muted></video>
-        <div id="status-overlay">Detecting camera...</div>
+    <header>Multi-Res Camera Studio</header>
+
+    <div id="viewport">
+        <video id="webcam" autoplay playsinline muted></video>
+        <div id="sensor-tag">Detecting Sensor...</div>
     </div>
 
-    <!-- Main Controls -->
-    <div id="controls">
-        <div class="control-row">
-            <label for="res-selector" style="font-size: 14px; color: #aaa;">Resolution Mode:</label>
-        </div>
-        <div class="control-row">
+    <div id="controls-panel">
+        <div class="control-group">
+            <label>Capture Quality</label>
             <select id="res-selector">
                 <option value="high" id="opt-high">High (Detecting...)</option>
                 <option value="medium" id="opt-medium">Medium (Detecting...)</option>
                 <option value="low" id="opt-low">Low (Detecting...)</option>
+                <option value="veryLow" id="opt-veryLow">Very Low (Detecting...)</option>
+                <option value="extremelyLow" id="opt-extremelyLow">Extremely Low (Detecting...)</option>
             </select>
         </div>
-        <div class="control-row">
-            <button id="btn-capture">Take Photo</button>
-        </div>
+        <button id="btn-capture">CAPTURE IMAGE</button>
     </div>
 
-    <!-- Hidden Canvas used for image processing -->
-    <canvas id="capture-canvas" style="display: none;"></canvas>
+    <!-- Processing Canvas -->
+    <canvas id="proc-canvas" style="display: none;"></canvas>
 
-    <!-- Preview & Save Screen -->
-    <div id="preview-container">
-        <img id="photo-preview" src="" alt="Captured Photo">
-        <div class="preview-controls">
-            <button id="btn-retake">Retake</button>
-            <button id="btn-save">Save to Device</button>
+    <!-- Preview Screen -->
+    <div id="preview-screen">
+        <img id="photo-output" src="" alt="Captured Image">
+        <div class="preview-bar">
+            <button id="btn-retake">RETAKE</button>
+            <button id="btn-save">SAVE TO DEVICE</button>
         </div>
     </div>
 
     <script>
-        // State variables
-        const video = document.getElementById('camera-stream');
-        const canvas = document.getElementById('capture-canvas');
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('proc-canvas');
         const ctx = canvas.getContext('2d');
-        const statusOverlay = document.getElementById('status-overlay');
+        const sensorTag = document.getElementById('sensor-tag');
         const resSelector = document.getElementById('res-selector');
-        
-        // Screens
-        const previewContainer = document.getElementById('preview-container');
-        const photoPreview = document.getElementById('photo-preview');
+        const previewScreen = document.getElementById('preview-screen');
+        const photoOutput = document.getElementById('photo-output');
 
-        // Detected Resolutions Object
+        // Resolution Data Store
         const resolutions = {
-            high: { width: 0, height: 0 },
-            medium: { width: 0, height: 0 },
-            low: { width: 0, height: 0 }
+            high: { w: 0, h: 0 },
+            medium: { w: 0, h: 0 },
+            low: { w: 0, h: 0 },
+            veryLow: { w: 0, h: 0 },
+            extremelyLow: { w: 0, h: 0 }
         };
 
-        // Initialize Camera and Detect Max Capabilities
-        async function initCamera() {
+        async function startCamera() {
             try {
-                // Requesting a very high ideal resolution forces the mobile camera 
-                // to report its maximum hardware capability.
-                const constraints = {
-                    video: {
-                        facingMode: 'environment', // Rear camera preferred
-                        width: { ideal: 4096 },
+                // Request 4K ideal to force the browser to reveal max hardware sensor capability
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: 'environment', 
+                        width: { ideal: 4096 }, 
                         height: { ideal: 2160 } 
                     },
                     audio: false
-                };
+                });
 
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
 
-                // Wait for video to actually start playing to get accurate dimensions
                 video.onloadedmetadata = () => {
-                    video.play();
-                    
                     const maxW = video.videoWidth;
                     const maxH = video.videoHeight;
-                    
-                    // Calculate exact resolutions based on maximum detected range
-                    resolutions.high = { width: maxW, height: maxH };
-                    // Medium is 50% scale (25% total pixels)
-                    resolutions.medium = { width: Math.floor(maxW * 0.5), height: Math.floor(maxH * 0.5) };
-                    // Low is 25% scale (6.25% total pixels)
-                    resolutions.low = { width: Math.floor(maxW * 0.25), height: Math.floor(maxH * 0.25) };
 
-                    // Update UI Labels to identify EXACT resolutions to the user
-                    document.getElementById('opt-high').textContent = `High - ${resolutions.high.width}x${resolutions.high.height}`;
-                    document.getElementById('opt-medium').textContent = `Medium - ${resolutions.medium.width}x${resolutions.medium.height}`;
-                    document.getElementById('opt-low').textContent = `Low - ${resolutions.low.width}x${resolutions.low.height}`;
+                    // Calculate the 5 tiers of resolution
+                    resolutions.high = { w: maxW, h: maxH };
+                    resolutions.medium = { w: Math.floor(maxW * 0.5), h: Math.floor(maxH * 0.5) };
+                    resolutions.low = { w: Math.floor(maxW * 0.25), h: Math.floor(maxH * 0.25) };
+                    resolutions.veryLow = { w: Math.floor(maxW * 0.125), h: Math.floor(maxH * 0.125) };
+                    resolutions.extremelyLow = { w: Math.floor(maxW * 0.0625), h: Math.floor(maxH * 0.0625) };
 
-                    statusOverlay.textContent = `Max Sensor: ${maxW}x${maxH}`;
+                    // Update UI Select Options with exact pixel counts
+                    updateOption('opt-high', 'High', resolutions.high);
+                    updateOption('opt-medium', 'Medium', resolutions.medium);
+                    updateOption('opt-low', 'Low', resolutions.low);
+                    updateOption('opt-veryLow', 'Very Low', resolutions.veryLow);
+                    updateOption('opt-extremelyLow', 'Extremely Low', resolutions.extremelyLow);
+
+                    sensorTag.innerText = `Hardware Sensor: ${maxW}x${maxH}`;
                 };
             } catch (err) {
-                console.error("Camera access error:", err);
-                statusOverlay.textContent = "Error: Camera access denied or unsupported.";
-                alert("Please ensure you have granted camera permissions and are running this on a secure HTTPS connection.");
+                sensorTag.innerText = "Error: Check Permissions";
+                console.error(err);
             }
         }
 
-        // Take Photo Function
+        function updateOption(id, label, res) {
+            document.getElementById(id).textContent = `${label} (${res.w} x ${res.h})`;
+        }
+
+        // Capture Action
         document.getElementById('btn-capture').addEventListener('click', () => {
-            if (!video.videoWidth) return; // Ensure video is active
-
-            // Get currently selected mode (high, medium, or low)
             const mode = resSelector.value;
-            const targetRes = resolutions[mode];
+            const target = resolutions[mode];
 
-            // Set canvas exact dimensions based on selected mode
-            canvas.width = targetRes.width;
-            canvas.height = targetRes.height;
+            // Set canvas to the specific chosen resolution
+            canvas.width = target.w;
+            canvas.height = target.h;
 
-            // Draw the video frame onto the canvas. 
-            // This inherently scales the high-res stream down to the exact requested mode dimensions.
+            // Draw video frame into the specific canvas size (handles downscaling automatically)
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Convert canvas to image data (JPEG for smaller mobile sizes)
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-
-            // Show preview screen
-            photoPreview.src = dataUrl;
-            previewContainer.style.display = 'flex';
+            // Export as high quality JPEG
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+            photoOutput.src = dataUrl;
+            previewScreen.style.display = 'flex';
         });
 
-        // Retake Photo
+        // Retake
         document.getElementById('btn-retake').addEventListener('click', () => {
-            previewContainer.style.display = 'none';
-            photoPreview.src = '';
+            previewScreen.style.display = 'none';
         });
 
-        // Save Photo to Local Device Storage
+        // Save to Local Device
         document.getElementById('btn-save').addEventListener('click', () => {
             const mode = resSelector.value;
-            const targetRes = resolutions[mode];
-
-            // Create an invisible anchor tag to trigger local file download
+            const res = resolutions[mode];
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            
             const link = document.createElement('a');
-            link.href = photoPreview.src;
-            
-            // Generate a filename with the timestamp and resolution info
-            const timestamp = new Date().getTime();
-            link.download = `photo_${mode}_${targetRes.width}x${targetRes.height}_${timestamp}.jpg`;
-            
-            // Append, click, and remove the link
-            document.body.appendChild(link);
+            link.download = `Photo_${mode}_${res.w}x${res.h}_${timestamp}.jpg`;
+            link.href = photoOutput.src;
             link.click();
-            document.body.removeChild(link);
 
-            // Hide preview, return to camera
-            previewContainer.style.display = 'none';
+            previewScreen.style.display = 'none';
         });
 
-        // Start everything when page loads
-        window.addEventListener('DOMContentLoaded', initCamera);
+        // Run on load
+        window.addEventListener('DOMContentLoaded', startCamera);
     </script>
 </body>
 </html>
