@@ -6,6 +6,10 @@
 
 A lightweight, single-page progressive web application (PWA) that allows users to capture photos at specific, dynamically calculated resolutions directly from their mobile device's browser. Built entirely with Vanilla HTML, CSS, and JavaScript.
 
+**Cloudflare Demos**
+- Main Branch - https://spa-camera.pages.dev/
+- v1 release - https://bce4d25f.spa-camera.pages.dev/
+
 ## ✨ Features
 
 - **Hardware Auto-Detection**: Automatically queries the device's camera sensor to determine its maximum supported resolution.
