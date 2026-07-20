@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Added viewport-fit=cover to allow safe-area inset detection -->
+    <!-- viewport-fit=cover allows safe-area inset detection for modern mobile devices -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Pro Multi-Res Camera</title>
@@ -134,7 +134,7 @@
             position: fixed;
             top: 0; left: 0; width: 100%; 
             height: 100vh;
-            height: 100dvh; /* Applies the same dynamic sizing to the absolute overlay */
+            height: 100dvh; 
             background: #000;
             z-index: 100;
             flex-direction: column;
@@ -204,6 +204,9 @@
         const previewScreen = document.getElementById('preview-screen');
         const photoOutput = document.getElementById('photo-output');
 
+        // Cloudflare Worker URL - UPDATE THIS AFTER DEPLOYING WORKER
+        const WORKER_BASE_URL = "https://YOUR_WORKER_URL_HERE.workers.dev"; 
+
         // Resolution Data Store
         const resolutions = {
             high: { w: 0, h: 0 },
@@ -238,7 +241,6 @@
                     resolutions.veryLow = { w: Math.floor(maxW * 0.125), h: Math.floor(maxH * 0.125) };
                     resolutions.extremelyLow = { w: Math.floor(maxW * 0.0625), h: Math.floor(maxH * 0.0625) };
 
-                    // Update UI Select Options with exact pixel counts
                     updateOption('opt-high', 'High', resolutions.high);
                     updateOption('opt-medium', 'Medium', resolutions.medium);
                     updateOption('opt-low', 'Low', resolutions.low);
@@ -257,22 +259,55 @@
             document.getElementById(id).textContent = `${label} (${res.w} x ${res.h})`;
         }
 
-        // Capture Action
+        // Capture Action & Auto-Upload to Cloudflare R2
         document.getElementById('btn-capture').addEventListener('click', () => {
             const mode = resSelector.value;
             const target = resolutions[mode];
 
-            // Set canvas to the specific chosen resolution
             canvas.width = target.w;
             canvas.height = target.h;
-
-            // Draw video frame into the specific canvas size (handles downscaling automatically)
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Export as high quality JPEG
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-            photoOutput.src = dataUrl;
-            previewScreen.style.display = 'flex';
+            // Update UI State
+            const captureBtn = document.getElementById('btn-capture');
+            captureBtn.textContent = "UPLOADING...";
+            captureBtn.style.backgroundColor = "var(--text-secondary)";
+            captureBtn.disabled = true;
+
+            // Convert to binary Blob and upload
+            canvas.toBlob(async (blob) => {
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                const filename = `Photo_${mode}_${target.w}x${target.h}_${timestamp}.jpg`;
+                
+                const workerUrl = `${WORKER_BASE_URL}/${filename}`;
+
+                try {
+                    const response = await fetch(workerUrl, {
+                        method: 'PUT',
+                        body: blob, 
+                        headers: { 'Content-Type': 'image/jpeg' }
+                    });
+
+                    if (response.ok) {
+                        // Display the preview via local object URL
+                        photoOutput.src = URL.createObjectURL(blob);
+                        previewScreen.style.display = 'flex';
+                        console.log("Successfully uploaded to R2:", filename);
+                    } else {
+                        alert("Upload failed. Server responded with: " + response.status);
+                    }
+                    
+                } catch (error) {
+                    console.error("Upload error:", error);
+                    alert("Network error. Could not upload photo.");
+                } finally {
+                    // Reset Button State
+                    captureBtn.textContent = "CAPTURE IMAGE";
+                    captureBtn.style.backgroundColor = "var(--accent)";
+                    captureBtn.disabled = false;
+                }
+
+            }, 'image/jpeg', 0.92);
         });
 
         // Retake
@@ -280,7 +315,7 @@
             previewScreen.style.display = 'none';
         });
 
-        // Save to Local Device
+        // Save to Local Device Backup
         document.getElementById('btn-save').addEventListener('click', () => {
             const mode = resSelector.value;
             const res = resolutions[mode];
@@ -288,7 +323,7 @@
             
             const link = document.createElement('a');
             link.download = `Photo_${mode}_${res.w}x${res.h}_${timestamp}.jpg`;
-            link.href = photoOutput.src;
+            link.href = photoOutput.src; // Uses the same local blob URL
             link.click();
 
             previewScreen.style.display = 'none';
